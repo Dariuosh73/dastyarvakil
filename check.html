@@ -1,0 +1,24 @@
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>بررسی نصب</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>body{font-family:Tahoma,system-ui,sans-serif;margin:0;padding:16px;background:#f5f6fa;color:#1a2236;line-height:1.9}h1{font-size:20px;margin:0 0 10px}li{margin:6px 0;list-style:none;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #d9deea}ul{padding:0}.ok{border-color:#2e7d32}.bad{border-color:#c62828;background:#fdecea}.warn{border-color:#b26a00;background:#fff4e0}button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #1c3d6b;background:#1c3d6b;color:#fff}small{color:#667}</style></head><body>
+<h1>بررسی نصب‌پذیری دستیار وکیل</h1><ul id="r"></ul><button id="ins" hidden>نصب برنامه</button><p><small>نتیجه را (متن یا تصویر) برای پشتیبانی بفرستید.</small></p>
+<script>
+const R=document.getElementById('r');const add=(c,t)=>{const l=document.createElement('li');l.className=c;l.textContent=(c==='ok'?'✔ ':c==='bad'?'✘ ':'⚠ ')+t;R.appendChild(l)};
+let ev=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();ev=e;add('ok','مرورگر اعلام کرد برنامه نصب‌شدنی است (beforeinstallprompt)');const b=document.getElementById('ins');b.hidden=false;b.onclick=()=>ev.prompt()});
+addEventListener('appinstalled',()=>add('ok','برنامه نصب شد'));
+(async()=>{
+add('warn','مرورگر: '+navigator.userAgent);
+add(isSecureContext?'ok':'bad','اتصال امن (https): '+(isSecureContext?'بله':'خیر'));
+const ua=navigator.userAgent;if(/Telegram|Instagram|FBAN|FBAV|Line\/|; wv\)/.test(ua))add('bad','به‌نظر می‌رسد داخل مرورگر یک برنامه‌ی دیگر (تلگرام و...) باز شده است؛ نشانی را در Chrome باز کنید.');
+if(matchMedia('(display-mode: standalone)').matches)add('ok','الان در حالت برنامه‌ی نصب‌شده (standalone) باز است');
+let m=null;try{const r=await fetch('manifest.webmanifest');add(r.ok?'ok':'bad','دریافت مانیفست: '+r.status);m=await r.json()}catch(e){add('bad','مانیفست خوانده نشد: '+e.message)}
+if(m){add(m.name?'ok':'bad','نام: '+(m.name||'ندارد'));add(m.display==='standalone'||m.display==='fullscreen'?'ok':'bad','display: '+m.display);add(m.start_url?'ok':'bad','start_url: '+m.start_url);
+ for(const ic of (m.icons||[])){try{const u=new URL(ic.src,location.href);const r=await fetch(u);const bl=await r.blob();const im=await createImageBitmap(bl);add(r.ok&&im.width>=144?'ok':'bad','آیکن '+ic.src+': وضعیت '+r.status+'، اندازه‌ی واقعی '+im.width+'×'+im.height+' (اعلام‌شده '+ic.sizes+')')}catch(e){add('bad','آیکن '+ic.src+' خوانده نشد: '+e.message)}}}
+const lk=document.querySelector('link[rel=manifest]');add(lk?'ok':'bad','تگ مانیفست در این صفحه: '+(lk?'هست':'نیست'));
+try{const x=await fetch('index.html',{cache:'no-store'}).then(r=>r.text());add(/rel="manifest"/.test(x)?'ok':'bad','تگ مانیفست در index.html: '+(/rel="manifest"/.test(x)?'هست':'نیست'));add(/serviceWorker/.test(x)?'ok':'bad','ثبت سرویس‌ورکر در index.html: '+(/serviceWorker/.test(x)?'هست':'نیست'))}catch(e){add('bad','index.html خوانده نشد')}
+if('serviceWorker' in navigator){try{const rg=await navigator.serviceWorker.getRegistration('./');add(rg?'ok':'warn','سرویس‌ورکر ثبت‌شده: '+(rg?(rg.active?'فعال':'در حال نصب'):'هنوز ثبت نشده (یک بار index.html را باز کنید و برگردید)'));
+ try{await navigator.serviceWorker.register('sw.js');add('ok','ثبت sw.js موفق بود')}catch(e){add('bad','ثبت sw.js ناموفق: '+e.message)}}catch(e){add('bad','خطا: '+e.message)}}else add('bad','مرورگر از سرویس‌ورکر پشتیبانی نمی‌کند');
+try{if(navigator.getInstalledRelatedApps){const a=await navigator.getInstalledRelatedApps();add('warn','برنامه‌های نصب‌شده‌ی مرتبط: '+a.length)}}catch(e){}
+setTimeout(()=>{if(!ev)add('warn','تا ۸ ثانیه رویداد نصب نیامد (اگر قبلاً نصب کرده‌اید یا مرورگر پشتیبانی نمی‌کند طبیعی است)')},8000);
+})();
+</script></body></html>
