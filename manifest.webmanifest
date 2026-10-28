@@ -30,5 +30,30 @@
  ],
  "id": "./index.html",
  "description": "میز کار پرونده‌ها و مهلت‌های وکیل",
- "orientation": "any"
+ "orientation": "any",
+ "prefer_related_applications": false,
+ "display_override": [
+  "standalone",
+  "minimal-ui"
+ ],
+ "categories": [
+  "business",
+  "productivity"
+ ],
+ "screenshots": [
+  {
+   "src": "shot-narrow.png",
+   "sizes": "390x844",
+   "type": "image/png",
+   "form_factor": "narrow",
+   "label": "میزکار"
+  },
+  {
+   "src": "shot-wide.png",
+   "sizes": "1200x800",
+   "type": "image/png",
+   "form_factor": "wide",
+   "label": "میزکار"
+  }
+ ]
 }
