@@ -1,0 +1,9 @@
+{
+  "appId": "ir.dariuosh.dastyarvakil",
+  "appName": "دستیار وکیل",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  }
+}
