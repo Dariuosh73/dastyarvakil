@@ -1,0 +1,19 @@
+{
+  "name": "dastyarvakil-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android packaging for Dastyar Vakil",
+  "scripts": {
+    "prepare:web": "node scripts/prepare-web.mjs",
+    "android:sync": "npm run prepare:web && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.1",
+    "@capacitor/core": "6.2.1",
+    "@capacitor/filesystem": "6.0.3",
+    "@capacitor/share": "6.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "6.2.1"
+  }
+}
