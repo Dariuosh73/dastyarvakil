@@ -112,3 +112,4 @@ jobs:
             app-release.apk.sha256
           if-no-files-found: error
           retention-days: 14
+          
