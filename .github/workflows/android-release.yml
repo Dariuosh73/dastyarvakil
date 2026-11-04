@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-  uses: actions/checkout@v4
-  with:
-    ref: android-capacitor
+      - name: Checkout Android project
+        uses: actions/checkout@v4
+        with:
+          ref: android-capacitor
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -53,7 +53,6 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          RUNNER_TEMP: ${{ runner.temp }}
         run: |
           KEYSTORE="$RUNNER_TEMP/release-keystore.p12"
           test -s "$KEYSTORE"
@@ -85,7 +84,6 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          RUNNER_TEMP: ${{ runner.temp }}
         run: node scripts/configure-android-signing.mjs
 
       - name: Build signed release APK
@@ -104,7 +102,7 @@ jobs:
 
           sha256sum "$APK" | tee app-release.apk.sha256
 
-      - name: Upload test APK
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
           name: dastyar-vakil-signed-release-test
@@ -113,4 +111,3 @@ jobs:
             app-release.apk.sha256
           if-no-files-found: error
           retention-days: 14
-          
