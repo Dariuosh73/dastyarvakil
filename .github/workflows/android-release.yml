@@ -15,18 +15,33 @@ jobs:
       - name: Checkout Android project
         uses: actions/checkout@v4
         with:
+          repository: Dariuosh73/dastyarvakil
           ref: android-capacitor
+          fetch-depth: 1
+
+      - name: Verify project files
+        run: |
+          echo "Current branch:"
+          git branch --show-current
+          echo "Current directory:"
+          pwd
+          echo "Project files:"
+          ls -la
+          test -f package.json
+          echo "package.json FOUND"
+          test -f scripts/prepare-web.mjs
+          echo "prepare-web.mjs FOUND"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
       - name: Install dependencies
         run: npm install
@@ -56,8 +71,21 @@ jobs:
         run: |
           KEYSTORE="$RUNNER_TEMP/release-keystore.p12"
           test -s "$KEYSTORE"
-          keytool -list -keystore "$KEYSTORE" -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
-          keytool -certreq -keystore "$KEYSTORE" -storetype PKCS12 -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" -file "$RUNNER_TEMP/keystore-check.csr" > /dev/null
+
+          keytool -list \
+            -keystore "$KEYSTORE" \
+            -storetype PKCS12 \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null
+
+          keytool -certreq \
+            -keystore "$KEYSTORE" \
+            -storetype PKCS12 \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -file "$RUNNER_TEMP/keystore-check.csr" > /dev/null
+
           echo "Keystore validation successful."
 
       - name: Configure release signing
@@ -71,13 +99,16 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease
 
-      - name: Verify APK signature
+      - name: Verify APK signature and checksum
         run: |
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
+
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
+
           "$APKSIGNER" verify --verbose --print-certs "$APK"
+
           sha256sum "$APK" | tee app-release.apk.sha256
 
       - name: Upload signed APK
