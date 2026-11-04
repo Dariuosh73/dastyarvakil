@@ -21,27 +21,14 @@ jobs:
 
       - name: Verify project files
         run: |
-          echo "Repository:"
-          git remote -v
-
           echo "Current branch:"
           git branch --show-current
-
           echo "Commit:"
           git rev-parse HEAD
-
-          echo "Current directory:"
-          pwd
-
           echo "Files:"
           ls -la
-
-          echo "Searching for package.json:"
-          find . -maxdepth 4 -name package.json -print
-
           test -f package.json
           echo "PACKAGE JSON FOUND"
-
           test -f scripts/prepare-web.mjs
           echo "prepare-web.mjs FOUND"
 
@@ -63,73 +50,3 @@ jobs:
         run: npm run prepare:web
 
       - name: Add Android platform
-        run: npx cap add android
-
-      - name: Sync Android
-        run: npx cap sync android
-
-      - name: Decode signing keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          test -n "$KEYSTORE_BASE64"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release-keystore.p12"
-          test -s "$RUNNER_TEMP/release-keystore.p12"
-
-      - name: Validate signing keystore
-        env:
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          KEYSTORE="$RUNNER_TEMP/release-keystore.p12"
-          test -s "$KEYSTORE"
-
-          keytool -list \
-            -keystore "$KEYSTORE" \
-            -storetype PKCS12 \
-            -storepass "$STORE_PASSWORD" \
-            -alias "$KEY_ALIAS" > /dev/null
-
-          keytool -certreq \
-            -keystore "$KEYSTORE" \
-            -storetype PKCS12 \
-            -storepass "$STORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" \
-            -alias "$KEY_ALIAS" \
-            -file "$RUNNER_TEMP/keystore-check.csr" > /dev/null
-
-          echo "Keystore validation successful."
-
-      - name: Configure release signing
-        env:
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: node scripts/configure-android-signing.mjs
-
-      - name: Build signed release APK
-        working-directory: android
-        run: ./gradlew assembleRelease
-
-      - name: Verify APK signature and checksum
-        run: |
-          APK="android/app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          test -x "$APKSIGNER"
-
-          "$APKSIGNER" verify --verbose --print-certs "$APK"
-
-          sha256sum "$APK" | tee app-release.apk.sha256
-
-      - name: Upload signed APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: dastyar-vakil-signed-release-test
-          path: |
-            android/app/build/outputs/apk/release/app-release.apk
-            app-release.apk.sha256
-          if-no-files-found: error
-          retention-days: 14
