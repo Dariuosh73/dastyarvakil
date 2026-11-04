@@ -50,6 +50,39 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release-keystore.p12"
           test -s "$RUNNER_TEMP/release-keystore.p12"
 
+      - name: Validate signing keystore
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          KEYSTORE="$RUNNER_TEMP/release-keystore.p12"
+
+          test -s "$KEYSTORE"
+
+          keytool -list \
+            -keystore "$KEYSTORE" \
+            -storetype PKCS12 \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null
+
+          keytool -certreq \
+            -keystore "$KEYSTORE" \
+            -storetype PKCS12 \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -file "$RUNNER_TEMP/keystore-check.csr" > /dev/null
+
+          echo "Keystore validation successful."
+
+          keytool -list -v \
+            -keystore "$KEYSTORE" \
+            -storetype PKCS12 \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" | grep -i "SHA256:"
+
       - name: Configure release signing
         env:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
