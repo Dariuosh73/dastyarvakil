@@ -16,11 +16,14 @@ for (const name of [
 }
 
 const androidStart = gradle.indexOf("android {");
-const buildTypesStart = gradle.indexOf("buildTypes {", androidStart);
+if (androidStart < 0) throw new Error("Android block not found");
 
-if (androidStart < 0 || buildTypesStart < 0) {
-  throw new Error("Android or buildTypes block not found");
+if (gradle.includes("signingConfigs {")) {
+  throw new Error("Signing configuration already exists; refusing to duplicate it.");
 }
+
+const buildTypesStart = gradle.indexOf("buildTypes {", androidStart);
+if (buildTypesStart < 0) throw new Error("buildTypes block not found");
 
 const signingConfig = `
     signingConfigs {
@@ -39,11 +42,11 @@ gradle =
   signingConfig +
   gradle.slice(buildTypesStart);
 
-const releaseStart = gradle.indexOf("release {", buildTypesStart);
+// Recalculate the index after insertion.
+const updatedBuildTypesStart = gradle.indexOf("buildTypes {", androidStart);
+const releaseStart = gradle.indexOf("release {", updatedBuildTypesStart);
 
-if (releaseStart < 0) {
-  throw new Error("Release build type not found");
-}
+if (releaseStart < 0) throw new Error("Release build type not found");
 
 const insertAt = releaseStart + "release {".length;
 
