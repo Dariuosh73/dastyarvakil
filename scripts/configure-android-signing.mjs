@@ -4,27 +4,25 @@ import { readFile, writeFile } from "node:fs/promises";
 const file = "android/app/build.gradle";
 let gradle = await readFile(file, "utf8");
 
-const required = [
+for (const name of [
   "STORE_PASSWORD",
   "KEY_ALIAS",
-  "KEY_PASSWORD"
-];
-
-for (const name of required) {
+  "KEY_PASSWORD",
+  "RUNNER_TEMP"
+]) {
   if (!process.env[name]) {
     throw new Error(`Missing environment variable: ${name}`);
   }
 }
 
-if (!gradle.includes("signingConfigs")) {
-  const androidBlock = gradle.indexOf("android {");
-  const buildTypes = gradle.indexOf("buildTypes {", androidBlock);
+const androidStart = gradle.indexOf("android {");
+const buildTypesStart = gradle.indexOf("buildTypes {", androidStart);
 
-  if (androidBlock < 0 || buildTypes < 0) {
-    throw new Error("Could not locate Android buildTypes block");
-  }
+if (androidStart < 0 || buildTypesStart < 0) {
+  throw new Error("Android or buildTypes block not found");
+}
 
-  const signingConfig = `
+const signingConfig = `
     signingConfigs {
         release {
             storeFile file(System.getenv("RUNNER_TEMP") + "/release-keystore.p12")
@@ -36,32 +34,23 @@ if (!gradle.includes("signingConfigs")) {
 
 `;
 
-  gradle =
-    gradle.slice(0, buildTypes) +
-    signingConfig +
-    gradle.slice(buildTypes);
+gradle =
+  gradle.slice(0, buildTypesStart) +
+  signingConfig +
+  gradle.slice(buildTypesStart);
+
+const releaseStart = gradle.indexOf("release {", buildTypesStart);
+
+if (releaseStart < 0) {
+  throw new Error("Release build type not found");
 }
 
-const releaseBlock = gradle.indexOf("release {", gradle.indexOf("buildTypes {"));
+const insertAt = releaseStart + "release {".length;
 
-if (releaseBlock < 0) {
-  throw new Error("Could not locate release build type");
-}
-
-const nextBrace = gradle.indexOf("}", releaseBlock);
-
-if (nextBrace < 0) {
-  throw new Error("Could not locate end of release block");
-}
-
-const releaseContent = gradle.slice(releaseBlock, nextBrace);
-
-if (!releaseContent.includes("signingConfig")) {
-  gradle =
-    gradle.slice(0, releaseBlock + "release {".length) +
-    "\n            signingConfig signingConfigs.release" +
-    gradle.slice(releaseBlock + "release {".length);
-}
+gradle =
+  gradle.slice(0, insertAt) +
+  "\n            signingConfig signingConfigs.release" +
+  gradle.slice(insertAt);
 
 await writeFile(file, gradle, "utf8");
 console.log("Release signing configuration added.");
