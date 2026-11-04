@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Android project
+            - name: Checkout Android project
         uses: actions/checkout@v4
         with:
           ref: android-capacitor
