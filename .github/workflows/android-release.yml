@@ -31,6 +31,28 @@ jobs:
           echo "package.json FOUND"
           test -f scripts/prepare-web.mjs
           echo "prepare-web.mjs FOUND"
+                - name: Verify project files
+        run: |
+          echo "Repository:"
+          git remote -v
+
+          echo "Current branch:"
+          git branch --show-current
+
+          echo "Commit:"
+          git rev-parse HEAD
+
+          echo "Current directory:"
+          pwd
+
+          echo "Files:"
+          ls -la
+
+          echo "Searching for package.json:"
+          find . -maxdepth 4 -name package.json -print
+
+          test -f package.json
+          echo "PACKAGE JSON FOUND"
 
       - name: Setup Node
         uses: actions/setup-node@v4
