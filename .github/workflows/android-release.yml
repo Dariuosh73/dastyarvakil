@@ -1,3 +1,4 @@
+
 name: Test Signed Android APK
 
 'on':
@@ -8,6 +9,7 @@ permissions:
 
 jobs:
   build:
+    name: Build and verify signed APK
     runs-on: ubuntu-latest
 
     steps:
@@ -17,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
       - name: Setup Java
         uses: actions/setup-java@v4
