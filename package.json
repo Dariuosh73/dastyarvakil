@@ -4,7 +4,10 @@
   "private": true,
   "description": "Android packaging for Dastyar Vakil",
   "scripts": {
-    "prepare:web": "node scripts/prepare-web.mjs",
+  "prepare:web": "node scripts/prepare-web.mjs",
+  "android:sync": "npm run prepare:web && cap sync android",
+  "android:signing": "node scripts/configure-android-signing.mjs"
+}
     "android:sync": "npm run prepare:web && cap sync android"
   },
   "dependencies": {
