@@ -13,7 +13,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+  uses: actions/checkout@v4
+  with:
+    ref: android-capacitor
 
       - name: Setup Node
         uses: actions/setup-node@v4
