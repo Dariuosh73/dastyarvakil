@@ -52,12 +52,13 @@ jobs:
           test -s "$RUNNER_TEMP/release-keystore.p12"
 
       - name: Configure release signing
-        env:
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          node scripts/configure-android-signing.mjs
+  env:
+    STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+    KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+    KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    RUNNER_TEMP: ${{ runner.temp }}
+  run: |
+    node scripts/configure-android-signing.mjs
 
       - name: Build signed release APK
         working-directory: android
