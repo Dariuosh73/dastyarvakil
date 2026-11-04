@@ -1,14 +1,13 @@
+
 {
   "name": "dastyarvakil-android",
   "version": "1.0.0",
   "private": true,
   "description": "Android packaging for Dastyar Vakil",
   "scripts": {
-  "prepare:web": "node scripts/prepare-web.mjs",
-  "android:sync": "npm run prepare:web && cap sync android",
-  "android:signing": "node scripts/configure-android-signing.mjs"
-}
-    "android:sync": "npm run prepare:web && cap sync android"
+    "prepare:web": "node scripts/prepare-web.mjs",
+    "android:sync": "npm run prepare:web && cap sync android",
+    "android:signing": "node scripts/configure-android-signing.mjs"
   },
   "dependencies": {
     "@capacitor/android": "6.2.1",
