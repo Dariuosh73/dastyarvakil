@@ -1,6 +1,7 @@
 // Runs after `npx cap add android` / `cap sync`: adds the in-app APK installer,
 // the install permission, and sets versionName / versionCode from APP_VERSION.
-import { readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, access, readdir, copyFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 
 const cfg = JSON.parse(await readFile("capacitor.config.json", "utf8"));
 const pkg = cfg.appId;
@@ -104,6 +105,28 @@ if (!f.includes("<cache-path")) {
   f = f.replace("</paths>", '    <cache-path name="my_cache_images" path="." />\n</paths>');
   await writeFile(fp, f, "utf8");
 }
+
+// App icon + splash: copy the prepared images into the generated Android project.
+const res = "android/app/src/main/res";
+const iconsDir = "android-icons";
+for (const d of await readdir(iconsDir, { withFileTypes: true })) {
+  if (d.isDirectory() && d.name.startsWith("mipmap-")) {
+    await mkdir(join(res, d.name), { recursive: true });
+    for (const f of await readdir(join(iconsDir, d.name))) {
+      await copyFile(join(iconsDir, d.name, f), join(res, d.name, f));
+    }
+  }
+}
+await mkdir(join(res, "values"), { recursive: true });
+await copyFile(join(iconsDir, "ic_launcher_background.xml"), join(res, "values", "ic_launcher_background.xml"));
+// splash: overwrite every existing splash.png with the navy splash image
+for (const d of await readdir(res, { withFileTypes: true })) {
+  if (d.isDirectory() && d.name.startsWith("drawable")) {
+    const target = join(res, d.name, "splash.png");
+    try { await access(target); await copyFile(join(iconsDir, "drawable", "splash.png"), target); } catch {}
+  }
+}
+console.log("Icons and splash installed.");
 
 const v = process.env.APP_VERSION;
 if (v) {
