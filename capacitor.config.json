@@ -3,6 +3,11 @@
   "appName": "دستیار وکیل",
   "webDir": "www",
   "bundledWebRuntime": false,
+  "server": {
+    "url": "https://dariuosh73.github.io/dastyarvakil/",
+    "errorPath": "offline.html",
+    "cleartext": false
+  },
   "android": {
     "allowMixedContent": false
   }
