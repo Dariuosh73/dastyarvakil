@@ -37,6 +37,7 @@ jobs:
           test -f scripts/prepare-web.mjs
           test -f scripts/patch-android.mjs
           test -f offline.html
+          test -d android-icons
 
       - name: Setup Node
         uses: actions/setup-node@v4
