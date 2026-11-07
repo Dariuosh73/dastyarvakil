@@ -81,6 +81,7 @@ await writeFile(`${dir}/ApkInstallerPlugin.java`, plugin, "utf8");
 await writeFile(`${dir}/MainActivity.java`, `package ${pkg};
 
 import android.os.Bundle;
+import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -88,6 +89,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkInstallerPlugin.class);
         super.onCreate(savedInstanceState);
+        // Hide content in the recents screen and block screenshots / screen recording.
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
     }
 }
 `, "utf8");
@@ -98,6 +101,14 @@ if (!m.includes("REQUEST_INSTALL_PACKAGES")) {
   m = m.replace("</manifest>", '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>');
   await writeFile(mf, m, "utf8");
 }
+
+// Hardening: no automatic system backup of app data, no cleartext traffic.
+m = await readFile(mf, "utf8");
+m = m.replace(/android:allowBackup="true"/, 'android:allowBackup="false"');
+if (!m.includes("usesCleartextTraffic")) {
+  m = m.replace("<application", '<application android:usesCleartextTraffic="false"');
+}
+await writeFile(mf, m, "utf8");
 
 const fp = "android/app/src/main/res/xml/file_paths.xml";
 let f = await readFile(fp, "utf8");
