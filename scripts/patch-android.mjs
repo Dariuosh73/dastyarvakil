@@ -78,6 +78,173 @@ public class ApkInstallerPlugin extends Plugin {
 `;
 await writeFile(`${dir}/ApkInstallerPlugin.java`, plugin, "utf8");
 
+// Native biometric gate: uses AndroidX BiometricPrompt + an AndroidKeyStore AES key that
+// requires a fresh biometric (or device-credential) check for every encrypt/decrypt. The
+// secret itself (the account's login password) never leaves the device and is only ever
+// held in memory for the moment it is wrapped/unwrapped; it is not readable without passing
+// the biometric prompt each time, because the key is created with setUserAuthenticationRequired(true).
+const biometricPlugin = `package ${pkg};
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.util.concurrent.Executor;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+
+@CapacitorPlugin(name = "NativeBiometric")
+public class NativeBiometricPlugin extends Plugin {
+    private static final String PREFS = "vz_bio";
+    private static final String KS = "AndroidKeyStore";
+
+    @PluginMethod
+    public void isAvailable(PluginCall call) {
+        BiometricManager bm = BiometricManager.from(getContext());
+        int res = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+        JSObject ret = new JSObject();
+        ret.put("isAvailable", res == BiometricManager.BIOMETRIC_SUCCESS);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setSecret(final PluginCall call) {
+        final String account = call.getString("account");
+        final String secret = call.getString("secret");
+        if (account == null || secret == null) { call.reject("missing_params"); return; }
+        try {
+            SecretKey key = makeKey(account);
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE, key);
+            authenticate(call, new BiometricPrompt.CryptoObject(cipher), result -> {
+                try {
+                    Cipher c = result.getCryptoObject().getCipher();
+                    byte[] iv = c.getIV();
+                    byte[] ct = c.doFinal(secret.getBytes(StandardCharsets.UTF_8));
+                    SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                    prefs.edit().putString("blob_" + account,
+                            Base64.encodeToString(iv, Base64.NO_WRAP) + "." + Base64.encodeToString(ct, Base64.NO_WRAP)).apply();
+                    call.resolve(new JSObject());
+                } catch (Exception e) {
+                    call.reject("encrypt_failed: " + e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            call.reject("keystore_error: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void getSecret(final PluginCall call) {
+        final String account = call.getString("account");
+        if (account == null) { call.reject("missing_params"); return; }
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String blob = prefs.getString("blob_" + account, null);
+        if (blob == null || !blob.contains(".")) { call.reject("no_secret"); return; }
+        try {
+            String[] parts = blob.split("\\\\.", 2);
+            byte[] iv = Base64.decode(parts[0], Base64.NO_WRAP);
+            final byte[] ct = Base64.decode(parts[1], Base64.NO_WRAP);
+            KeyStore ks = KeyStore.getInstance(KS);
+            ks.load(null);
+            SecretKey key = (SecretKey) ks.getKey("vz_bio_" + account, null);
+            if (key == null) { call.reject("no_key"); return; }
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
+            authenticate(call, new BiometricPrompt.CryptoObject(cipher), result -> {
+                try {
+                    Cipher c = result.getCryptoObject().getCipher();
+                    byte[] pt = c.doFinal(ct);
+                    JSObject ret = new JSObject();
+                    ret.put("secret", new String(pt, StandardCharsets.UTF_8));
+                    call.resolve(ret);
+                } catch (Exception e) {
+                    call.reject("decrypt_failed: " + e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            call.reject("read_failed: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void removeSecret(PluginCall call) {
+        final String account = call.getString("account");
+        try {
+            if (account != null) {
+                KeyStore ks = KeyStore.getInstance(KS);
+                ks.load(null);
+                if (ks.containsAlias("vz_bio_" + account)) ks.deleteEntry("vz_bio_" + account);
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("blob_" + account).apply();
+            }
+        } catch (Exception ignored) {}
+        call.resolve();
+    }
+
+    private SecretKey makeKey(String account) throws Exception {
+        KeyStore ks = KeyStore.getInstance(KS);
+        ks.load(null);
+        String alias = "vz_bio_" + account;
+        if (ks.containsAlias(alias)) ks.deleteEntry(alias);
+        KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(alias,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setUserAuthenticationRequired(true)
+                .setInvalidatedByBiometricEnrollment(true)
+                .build();
+        KeyGenerator kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KS);
+        kg.init(spec);
+        return kg.generateKey();
+    }
+
+    private interface OnOk { void run(BiometricPrompt.AuthenticationResult result); }
+
+    private void authenticate(final PluginCall call, final BiometricPrompt.CryptoObject cryptoObject, final OnOk onOk) {
+        final FragmentActivity activity = (FragmentActivity) getActivity();
+        activity.runOnUiThread(() -> {
+            Executor executor = ContextCompat.getMainExecutor(getContext());
+            BiometricPrompt prompt = new BiometricPrompt(activity, executor, new BiometricPrompt.AuthenticationCallback() {
+                @Override
+                public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                    onOk.run(result);
+                }
+                @Override
+                public void onAuthenticationError(int errorCode, CharSequence errString) {
+                    call.reject("auth_error: " + errString, String.valueOf(errorCode));
+                }
+                @Override
+                public void onAuthenticationFailed() {
+                    // let the system prompt retry; only error/cancel ends the call
+                }
+            });
+            BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("ورود به دستیار وکیل")
+                    .setSubtitle("با اثر انگشت تأیید کنید")
+                    .setNegativeButtonText("انصراف")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build();
+            prompt.authenticate(promptInfo, cryptoObject);
+        });
+    }
+}
+`;
+await writeFile(`${dir}/NativeBiometricPlugin.java`, biometricPlugin, "utf8");
+
 await writeFile(`${dir}/MainActivity.java`, `package ${pkg};
 
 import android.os.Bundle;
@@ -88,6 +255,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkInstallerPlugin.class);
+        registerPlugin(NativeBiometricPlugin.class);
         super.onCreate(savedInstanceState);
         // Hide content in the recents screen and block screenshots / screen recording.
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
@@ -95,10 +263,29 @@ public class MainActivity extends BridgeActivity {
 }
 `, "utf8");
 
+// androidx.biometric for the native biometric plugin above.
+{
+  const gf = "android/app/build.gradle";
+  let g = await readFile(gf, "utf8");
+  if (!g.includes("androidx.biometric:biometric")) {
+    g = g.replace(/dependencies\s*\{/, (m) => `${m}\n    implementation "androidx.biometric:biometric:1.1.0"`);
+    await writeFile(gf, g, "utf8");
+  }
+}
+
 const mf = "android/app/src/main/AndroidManifest.xml";
 let m = await readFile(mf, "utf8");
 if (!m.includes("REQUEST_INSTALL_PACKAGES")) {
   m = m.replace("</manifest>", '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>');
+  await writeFile(mf, m, "utf8");
+}
+m = await readFile(mf, "utf8");
+if (!m.includes("POST_NOTIFICATIONS")) {
+  m = m.replace("</manifest>", '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n</manifest>');
+  await writeFile(mf, m, "utf8");
+}
+if (!m.includes("USE_BIOMETRIC")) {
+  m = m.replace("</manifest>", '    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n</manifest>');
   await writeFile(mf, m, "utf8");
 }
 
