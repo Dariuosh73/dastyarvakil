@@ -1,7 +1,7 @@
 // Network-first for the app shell: each host update reaches users; cache is only the offline fallback.
 // laws.json is stale-while-revalidate: it is large (~2.7MB) and changes only with a release, so a
 // returning user gets it instantly from cache while a fresh copy loads quietly in the background.
-const C='vakil-v4.8';
+const C='vakil-v4.9';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./privacy.html'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.all(FILES.map(f=>c.add(f).catch(()=>{})))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
